@@ -9,10 +9,17 @@ import asyncio
 
 
 
-# define some basic commands
+# load some basic vars
 AUTH_FILE = "authenticated_users.txt"
 load_dotenv()
 DISCORD_TOKEN = os.getenv("TOKEN")
+REPORT_FORM_LINK = "https://forms.gle/XkSsbV6Mn8jpcCRq5"
+BAN_APPEAL_FROM_LINk = "https://forms.gle/vzDcdREX8c3k3Wuw8"
+GAME_MOD_APP = "https://forms.office.com/r/r4Njy3qjhs"
+GAME_MANAGER_APP = "https://forms.office.com/r/RNeTcThhrr"
+DISCORD_MANAGER_APP = "https://forms.office.com/r/RNeTcThhrr"
+CO_OWNER_APP = "https://forms.office.com/r/RNeTcThhrr"
+COMMUNITY_MANAGER_APP = "https://forms.office.com/r/RNeTcThhrr"
 intents = discord.Intents.default()
 intents.message_content = True
 activity = discord.Activity(type=discord.ActivityType.watching, name="/help")
@@ -43,14 +50,16 @@ task_completed = discord.Embed(
 )
 
 
-#define some classes
+
+
+#status button embed gui
 class Buttons(discord.ui.View):
     def __init__(self):
         super().__init__()
 
     @discord.ui.button(label="Startup", style=discord.ButtonStyle.green)
     async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(embed=task_completed)
+        await interaction.response.send_message(embed=task_completed, ephemeral=True)
         channel = bot.get_channel(1222911491821277276)
         status = bot.get_channel(1223028334170996826)
         embed = discord.Embed(
@@ -67,7 +76,7 @@ class Buttons(discord.ui.View):
 
     @discord.ui.button(label="Shutdown", style=discord.ButtonStyle.danger)
     async def shutdown(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(embed=task_completed)
+        await interaction.response.send_message(embed=task_completed, ephemeral=True)
         channel = bot.get_channel(1222911491821277276)
         status = bot.get_channel(1223028334170996826)
         embed = discord.Embed(
@@ -81,7 +90,92 @@ class Buttons(discord.ui.View):
         await channel.send(embed=embed)
 
 
-# define reading and writing to/from authenticated_users.txt
+
+# apply for staff button embed gui
+class Jobs(discord.ui.View):
+    def __init__(self):
+        super().__init__()
+
+        btn1 = discord.ui.Button(label="Game Moderator", style=discord.ButtonStyle.primary, url=GAME_MOD_APP)
+        btn2 = discord.ui.Button(label="Game Manager", style=discord.ButtonStyle.primary, url=GAME_MANAGER_APP)
+        btn3 = discord.ui.Button(label="Discord Manager", style=discord.ButtonStyle.primary, url=DISCORD_MANAGER_APP)
+        btn4 = discord.ui.Button(label="Co Owner", style=discord.ButtonStyle.primary, url=CO_OWNER_APP)
+        btn5 = discord.ui.Button(label="Community Manager", style=discord.ButtonStyle.primary, url=COMMUNITY_MANAGER_APP)
+        self.add_item(btn1)
+        self.add_item(btn2)
+        self.add_item(btn3)
+        self.add_item(btn4)
+        self.add_item(btn5)
+
+
+# Support button embed gui
+class Support(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=0)
+
+        btn1 = discord.ui.Button(label="Report Player Or Staff", url=REPORT_FORM_LINK, style=discord.ButtonStyle.danger)
+        btn2 = discord.ui.Button(label="Ban Appeal", style=discord.ButtonStyle.danger, url=BAN_APPEAL_FROM_LINk)
+
+        self.add_item(btn1)
+        self.add_item(btn2)
+
+    async def on_timeout(self):
+        pass
+
+    @discord.ui.button(label="Open General Ticket", style=discord.ButtonStyle.primary)
+    async def open_ticket_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        support_role = discord.utils.get(interaction.guild.roles, name="support team")
+        ticket_maker = interaction.user
+        ticket_name = ticket_maker.name
+        overwrites = {
+            interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            ticket_maker: discord.PermissionOverwrite(view_channel=True),
+            support_role: discord.PermissionOverwrite(view_channel=True),
+            interaction.guild.me: discord.PermissionOverwrite(view_channel=True)
+        }
+
+        # Check if a channel with the user's name already exists
+        existing_channel = discord.utils.get(interaction.guild.text_channels, name=ticket_name)
+        if existing_channel:
+            # Disable the button and send a message indicating that a ticket already exists
+            embed = discord.Embed(
+                title="New Town City Support",
+                description="Sorry, you already have a ticket open.",
+                colour=discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        else:
+            try:
+                ticket_channel = await interaction.guild.create_text_channel(name=ticket_name, overwrites=overwrites)
+                ticket_channel_id = ticket_channel.id
+                ticket_link = f"[Go to ticket](https://discord.com/channels/{interaction.guild.id}/{ticket_channel_id})"
+                ticket_embed = discord.Embed(
+                    title="New Town City Support Ticket",
+                    description="Please provide as much detail as possible!",
+                    colour=discord.Color.blue()
+                )
+                support_ticket_embed = discord.Embed(
+                    title="Ticket Created!",
+                    description=f"Please provide as much detail as possible \n{ticket_link}",
+                    colour=discord.Color.blue()
+                )
+                await interaction.response.send_message(embed=support_ticket_embed, ephemeral=True)
+                await ticket_channel.send(embed=ticket_embed)
+                print(f"New ticket:{ticket_link}, {support_role}, {ticket_maker}, {ticket_name}, {ticket_channel_id}")
+            except discord.errors.HTTPException as e:
+                print(f"ERROR: FAILED TO CREATE NEW TICKET CHANNEL! FULL ERROR: {e}")
+
+
+
+    @discord.ui.button(label="Apply For Staff", style=discord.ButtonStyle.green)
+    async def apply_for_staff_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        view = Jobs()
+        await interaction.response.send_message(ephemeral=True, view=view)
+
+
+
+
+# define reading and writing to authenticated_users.txt
 async def read_authenticated_users():
     try:
         with open(AUTH_FILE, "r") as file:
@@ -99,11 +193,11 @@ async def write_authenticated_users(authenticated_users):
 
 
 
-
 # when bot starts it should print Logged in as username and should start running backend.py
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user}')
+    await support_reset_startup()
     #subprocess.Popen(["python", "backend.py"])
     try:
         synced = await bot.tree.sync()
@@ -112,6 +206,51 @@ async def on_ready():
         print(e)
 
 
+
+
+async def support_reset_startup():
+    authenticated_users = await read_authenticated_users()
+    guild = bot.guilds[1221200110197674075]  # Assuming the bot is in only one guild
+    support_channel = guild.get_channel(1223250744216649818)  # Your support channel ID
+
+    if authenticated_users and support_channel:
+        view = Support()
+
+        await support_channel.purge(limit=None)
+
+        embed = discord.Embed(
+            title="New Town City Support",
+            description="Welcome to New Town City support! \n \n In order to speed up our support process, please choose from one of the support categories listed below! Our staff team is ready to assist you with any issues you may be experiencing. \n \n Please DO NOT DM staff members unless the tool is not working. Use support tickets for a faster response. Please only open one ticket at a time!",
+            colour=discord.Color.blue()
+        )
+
+        await support_channel.send(embed=embed, view=view)
+
+
+@bot.tree.command(name="support_reset", description="Creates/Resets the support GUI")
+async def support_reset(interaction: discord.Interaction):
+    authenticated_users = await read_authenticated_users()
+    support_channel = bot.get_channel(1223250744216649818)
+
+    if interaction.user.id in authenticated_users:
+
+        view = Support()
+
+        await support_channel.purge(limit=None)
+
+        embed = discord.Embed(
+            title="New Town City Support",
+            description="Welcome to New Town City support! \n \n In order to speed up our support process, please choose from one of the support categories listed below! Our staff team is ready to assist you with any issues you may be experiencing. \n \n Please DO NOT DM staff members unless the tool is not working. Use support tickets for a faster response. Please only open one ticket at a time!",
+            colour=discord.Color.blue()
+        )
+
+        await interaction.response.send_message(",./!*&")
+        await support_channel.send(embed=embed, view=view)
+        if support_channel:
+            async for message in support_channel.history(limit=None):
+                if ",./!*&" in message.content.lower():
+                    await message.delete()
+                    print("LOG: Response Message Deleted For /support_reset")
 
 
 
@@ -280,11 +419,11 @@ async def remove(interaction: discord.Interaction, userid: str):
 
 
 # help slash command
-@bot.tree.command(name="help", description="View all the commmands for this bot")
+@bot.tree.command(name="help", description="View all the commands for this bot")
 async def help(interaction: discord.Interaction):
     commands_embed = discord.Embed(
         title="NTC Commands",
-        description="/commands (shows the list of commands) \n /auth (authenticates users to use NTC commands) \n /remove (removes users from the auth list) \n /post (gives options to post updates and SSU's) \n /support (open a support tick for NTC)",
+        description="/help (shows the list of commands) \n /auth (authenticates users to use NTC commands) \n /remove (removes users from the auth list) \n /announcement (posts an announcement in the channel) \n /support_rest (resets the ticket support sys) \n /reload_cfg (reloads the bots config) \n /status (changes the servers status)",
         color=discord.Color.blue()
     )
     user=interaction.user
@@ -317,8 +456,6 @@ async def reload_cfg(interaction: discord.Interaction):
         await interaction.response.send_message(embed=embed, ephemeral=True)  # Await the send_message() coroutine
     else:
         await interaction.response.send_message(embed=perm_error, ephemeral=True)  # Await the send_message() coroutine
-
-
 
 # start bot loop
 bot.run(DISCORD_TOKEN)
