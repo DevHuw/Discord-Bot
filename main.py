@@ -439,8 +439,9 @@ async def support_reset_startup():
 # look up slash command
 @bot.tree.command(name="lookup", description="Looks up discord user and outputs their roblox profile")
 async def lookup(interaction: discord.Interaction, user: discord.Member):
+    owner_role = discord.utils.get(interaction.guild.roles, name="Owner")
     authenticated_users = await read_authenticated_users()
-    if interaction.user.id in authenticated_users:
+    if interaction.user.id in authenticated_users and owner_role in interaction.user.roles:
         bloxlink_api = f'https://api.blox.link/v4/public/guilds/1221200110197674075/discord-to-roblox/{user.id}'
         bloxlink_api_key = 'e44fb0bf-21ac-4ef8-8c4d-8cb1dcae378e'
         headers = {"Authorization": bloxlink_api_key}
@@ -478,7 +479,7 @@ async def lookup(interaction: discord.Interaction, user: discord.Member):
         else:
             print(f"ERROR: Could not get {user.name} Full Error")
     else:
-        await interaction.response.send_message("Not Permitted!", ephemeral=True)
+        await interaction.response.send_message(embed=perm_error, ephemeral=True)
 
 
 
@@ -487,9 +488,10 @@ async def lookup(interaction: discord.Interaction, user: discord.Member):
 @bot.tree.command(name="support_reset", description="Creates/Resets the support GUI")
 async def support_reset(interaction: discord.Interaction):
     authenticated_users = await read_authenticated_users()
+    supervisor_role = discord.utils.get(interaction.guild.roles, name="Owner")
     support_channel = bot.get_channel(1223250744216649818)
 
-    if interaction.user.id in authenticated_users:
+    if interaction.user.id in authenticated_users and supervisor_role in interaction.user.roles:
 
         view = Support()
 
@@ -508,6 +510,8 @@ async def support_reset(interaction: discord.Interaction):
                 if ",./!*&" in message.content.lower():
                     await message.delete()
                     print("LOG: Response Message Deleted For /support_reset")
+    else:
+        await interaction.response.send_message(embed=perm_error, ephemeral=True)
 
 
 
@@ -584,9 +588,10 @@ async def announcement(interaction: discord.Interaction):
 # status slash command
 @bot.tree.command(name="status", description="Change the servers status")
 async def status(interaction: discord.Interaction):
+    owner_role = discord.utils.get(interaction.guild.roles, name="Owner")
     authenticated_users = await read_authenticated_users()
 
-    if interaction.user.id in authenticated_users:
+    if interaction.user.id in authenticated_users and owner_role in interaction.user.roles:
         await interaction.response.send_message(embed=sent_dm, ephemeral=True)
 
         embed = discord.Embed(
@@ -603,7 +608,7 @@ async def status(interaction: discord.Interaction):
 # auth slash command
 @bot.tree.command(name="auth", description="add users to auth list")
 async def auth(interaction: discord.Interaction):
-    supervisor_role = discord.utils.get(interaction.guild.roles, name="supervisor")
+    supervisor_role = discord.utils.get(interaction.guild.roles, name="Owner")
     authenticated_users = await read_authenticated_users()
 
     if supervisor_role in interaction.user.roles and int(interaction.user.id) in authenticated_users:
@@ -639,13 +644,12 @@ async def auth(interaction: discord.Interaction):
 # remove slash command
 @bot.tree.command(name="remove", description="Remove user IDs from auth")
 async def remove(interaction: discord.Interaction, userid: str):
-
-    owner_role = discord.utils.get(interaction.guild.roles, name="Owner")
+    owner_role = 618331718692241408
     print("userid is ", userid)
 
     try:
         authenticated_users = await read_authenticated_users()
-        if owner_role in interaction.user.roles and int(userid) in authenticated_users:
+        if owner_role in interaction.user.id and int(userid) in authenticated_users:
             await interaction.response.send_message(embed=sent_dm, ephemeral=True)
             authenticated_users.remove(int(userid))
             await write_authenticated_users(authenticated_users)
@@ -691,10 +695,11 @@ async def help(interaction: discord.Interaction):
 # reload_cfg slash command
 @bot.tree.command(name="reload_cfg", description="Reloads the bots config")
 async def reload_cfg(interaction: discord.Interaction):
+    owner_role = discord.utils.get(interaction.guild.roles, name="Owner")
     authenticated_users = await read_authenticated_users()
 
 
-    if interaction.user.id in authenticated_users:
+    if interaction.user.id in authenticated_users and owner_role in interaction.user.roles:
         vc_channel = bot.get_channel(1223028334170996826)
         channel = bot.get_channel(1222911491821277276)
         async for message in channel.history(limit=None):
