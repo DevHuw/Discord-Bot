@@ -472,13 +472,13 @@ async def lookup(interaction: discord.Interaction, user: discord.Member):
                     title=f"Roblox Look Up For {user.name}",
                     description=f"Description: {user_description} \n Created On: {user_created} \n Banned? {user_isBanned} \n Roblox Verified Badge? {user_hasVerifiedBadge} \n Username: {user_name} \n Display Name: {user_displayName} \n Roblox Profile Link: {user_link}"
                 )
-                interaction.response.send_message(embed=embed, ephemeral=True)
+                await interaction.response.send_message(embed=embed, ephemeral=True)
             else:
                 print(f"ERROR: Could not get {user.name} Roblox error")
         else:
             print(f"ERROR: Could not get {user.name} Full Error")
     else:
-        interaction.response.send_message("Not Permitted!", ephemeral=True)
+        await interaction.response.send_message("Not Permitted!", ephemeral=True)
 
 
 
