@@ -1,11 +1,13 @@
 # import all objectives
 import os
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord import app_commands
 from dotenv import load_dotenv
 import subprocess
 import asyncio
+import requests
+import json
 
 
 
@@ -21,9 +23,10 @@ DISCORD_MANAGER_APP = "https://forms.office.com/r/RNeTcThhrr"
 CO_OWNER_APP = "https://forms.office.com/r/RNeTcThhrr"
 COMMUNITY_MANAGER_APP = "https://forms.office.com/r/RNeTcThhrr"
 intents = discord.Intents.default()
+intents.members = True
 intents.message_content = True
 activity = discord.Activity(type=discord.ActivityType.watching, name="/help")
-bot = commands.Bot(command_prefix=".",intents=intents, activity=activity, status=discord.Status.online)
+bot = commands.Bot(command_prefix=".", intents=intents, activity=activity, status=discord.Status.online)
 timeout_embed = discord.Embed(
     title="Timeout",
     description="Sorry, you took too long to respond.",
@@ -91,6 +94,8 @@ class Buttons(discord.ui.View):
 
 
 
+
+
 # apply for staff button embed gui
 class Jobs(discord.ui.View):
     def __init__(self):
@@ -108,13 +113,128 @@ class Jobs(discord.ui.View):
         self.add_item(btn5)
 
 
+
+
+
+
+# ticket claim and close handling
+class Ticket_Close(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=0)
+
+    async def on_timeout(self):
+        pass
+
+
+    @discord.ui.button(label="Confirm", style=discord.ButtonStyle.green)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        channel_id = interaction.channel_id
+        channel = interaction.guild.get_channel(channel_id)
+
+        if channel:
+            embed = discord.Embed(
+                title="Deleting Ticket",
+                description="Thanks for using our ticket tool! \n You ticket will now be deleted",
+                colour=discord.Color.red()
+            )
+            if interaction.message.author == bot.user:
+                await interaction.message.delete()
+            await interaction.response.send_message(embed=embed)
+            await asyncio.sleep(delay=10)
+            await channel.delete()
+
+
+
+class Ticket_View(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=0)
+
+    async def on_timeout(self):
+        pass
+
+
+    @discord.ui.button(label="🔒  Close", style=discord.ButtonStyle.danger)
+    async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        view = Ticket_Close()
+        embed = discord.Embed(
+            title="Close Ticket?",
+            description="Are you sure you want to close the ticket?",
+            colour=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, view=view)
+
+
+
+    @discord.ui.button(label="🎟️  Claim", style=discord.ButtonStyle.primary)
+    async def claim_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        support_role = discord.utils.get(interaction.guild.roles, name="support team")
+
+        if support_role in interaction.user.roles:
+            channel_id = interaction.channel_id
+            channel = interaction.guild.get_channel(channel_id)
+            new_category_id = 1223336507339837470  # Replace this with the ID of the new category
+            new_category = interaction.guild.get_channel(new_category_id)
+            if channel:
+                old_name = channel.name
+                old_name_convert = old_name.strip("unclaimed-")
+                old_name_start = old_name.startswith("claimed-")
+                try:
+                    if interaction.user.display_name in old_name:
+                        print("User not permitted: code 401")
+                        embed = discord.Embed(
+                            title="Could not claim ticket.",
+                            description="You are not allowed to claim your own ticket!",
+                            colour=discord.Color.red()
+                        )
+                        await interaction.response.send_message(embed=embed, ephemeral=True)
+                    else:
+                        if old_name_start:
+                            embed = discord.Embed(
+                                title="Ticket Already Claimed!",
+                                description="Sorry this ticket is already claimed!",
+                                colour=discord.Color.red()
+                            )
+                            await interaction.response.send_message(embed=embed, ephemeral=True)
+                        else:
+                            await channel.edit(name=f"claimed {old_name_convert}", category=new_category)
+                            user = interaction.user.display_name
+                            embed = discord.Embed(
+                                title=f"{user} has claimed your ticket!",
+                                description=f"{user} will now help you with what ever your problem is!",
+                                colour=discord.Color.blue()
+                            )
+                    await interaction.response.send_message(embed=embed)
+                except Exception as e:
+                    print(f"Error occurred while editing channel name: {e}")
+            else:
+                print("No username found in channel name.")
+        else:
+            if support_role in interaction.user.roles:
+                print("Channel not found: code 404")
+                embed = discord.Embed(
+                    title="Sorry! Something is wrong!",
+                    description="Please contract huw7737 for help! \n Error Code: 404",
+                    colour=discord.Color.from_rgb(r=255, g=0, b=0)
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+            else:
+                print("User not authorized: code 401")
+                embed = discord.Embed(
+                    title="Could not claim ticket.",
+                    description="You are not allowed to claim your own ticket!",
+                    colour=discord.Color.red()
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+
 # Support button embed gui
 class Support(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=0)
 
-        btn1 = discord.ui.Button(label="Report Player Or Staff", url=REPORT_FORM_LINK, style=discord.ButtonStyle.danger)
-        btn2 = discord.ui.Button(label="Ban Appeal", style=discord.ButtonStyle.danger, url=BAN_APPEAL_FROM_LINk)
+        btn1 = discord.ui.Button(label="🚫  Report Player Or Staff", url=REPORT_FORM_LINK, style=discord.ButtonStyle.primary)
+        btn2 = discord.ui.Button(label="📩  Ban Appeal", style=discord.ButtonStyle.primary, url=BAN_APPEAL_FROM_LINk)
 
         self.add_item(btn1)
         self.add_item(btn2)
@@ -122,7 +242,7 @@ class Support(discord.ui.View):
     async def on_timeout(self):
         pass
 
-    @discord.ui.button(label="Open General Ticket", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="🎟️  Open General Ticket", style=discord.ButtonStyle.primary)
     async def open_ticket_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         support_role = discord.utils.get(interaction.guild.roles, name="support team")
         ticket_maker = interaction.user
@@ -135,18 +255,21 @@ class Support(discord.ui.View):
         }
 
         # Check if a channel with the user's name already exists
-        existing_channel = discord.utils.get(interaction.guild.text_channels, name=ticket_name)
-        if existing_channel:
+        existing_channel_unclaimed = discord.utils.get(interaction.guild.text_channels, name=f"unclaimed-{ticket_name}")
+        existing_channel_claimed = discord.utils.get(interaction.guild.text_channels, name=f"claimed-{ticket_name}")
+
+        if existing_channel_unclaimed or existing_channel_claimed:
             # Disable the button and send a message indicating that a ticket already exists
             embed = discord.Embed(
                 title="New Town City Support",
-                description="Sorry, you already have a ticket open.",
+                description="Sorry, you already have a ticket open!",
                 colour=discord.Color.red()
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
         else:
             try:
-                ticket_channel = await interaction.guild.create_text_channel(name=ticket_name, overwrites=overwrites)
+                unclaimed_tickets = interaction.guild.get_channel(1223336352129744896)
+                ticket_channel = await unclaimed_tickets.create_text_channel(name=f"Unclaimed {ticket_name}", overwrites=overwrites)
                 ticket_channel_id = ticket_channel.id
                 ticket_link = f"[Go to ticket](https://discord.com/channels/{interaction.guild.id}/{ticket_channel_id})"
                 ticket_embed = discord.Embed(
@@ -160,14 +283,15 @@ class Support(discord.ui.View):
                     colour=discord.Color.blue()
                 )
                 await interaction.response.send_message(embed=support_ticket_embed, ephemeral=True)
-                await ticket_channel.send(embed=ticket_embed)
+                view = Ticket_View()
+                await ticket_channel.send(embed=ticket_embed, view=view)
                 print(f"New ticket:{ticket_link}, {support_role}, {ticket_maker}, {ticket_name}, {ticket_channel_id}")
             except discord.errors.HTTPException as e:
                 print(f"ERROR: FAILED TO CREATE NEW TICKET CHANNEL! FULL ERROR: {e}")
 
 
 
-    @discord.ui.button(label="Apply For Staff", style=discord.ButtonStyle.green)
+    @discord.ui.button(label="🖥️  Apply For Staff", style=discord.ButtonStyle.green)
     async def apply_for_staff_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         view = Jobs()
         await interaction.response.send_message(ephemeral=True, view=view)
@@ -192,11 +316,29 @@ async def write_authenticated_users(authenticated_users):
 
 
 
+#update member count
+async def update_member_count():
+    while True:
+        guild = bot.get_guild(1221200110197674075)
+        member_count = guild.member_count
+        channel = bot.get_channel(1221213562270384240)
+        await channel.edit(name=f"All Members: {member_count}")
+        print(f"All Members: {member_count}")
+
+        member_count2 = member_count - 2
+        channel = bot.get_channel(1221213566150115422)
+        await channel.edit(name=f"Members: {member_count2}")
+        print(f"Members: {member_count2}")
+        await asyncio.sleep(900)
+
+
+
 
 # when bot starts it should print Logged in as username and should start running backend.py
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user}')
+    print(bot.guilds)
     await support_reset_startup()
     #subprocess.Popen(["python", "backend.py"])
     try:
@@ -204,14 +346,73 @@ async def on_ready():
         print(f"Synced {len(synced)} commands")
     except Exception as e:
         print(e)
+    await update_member_count()
+
+
+
+# when a user join do a few things
+@bot.event
+async def on_member_join(member):
+    print(f"{member.name} Joined Server")
+    un_verified = discord.utils.get(member.guild.roles, name="Unverified")
+    await member.add_roles(un_verified, reason="New Server Member")
+    verified = discord.utils.get(member.guild.roles, name="Member")
+    banned_role = discord.utils.get(member.guild.roles, name="Banned_On_Roblox")
+    bloxlink_api = f'https://api.blox.link/v4/public/guilds/1221200110197674075/discord-to-roblox/{member.id}'
+    bloxlink_api_key = 'e44fb0bf-21ac-4ef8-8c4d-8cb1dcae378e'
+    headers = {"Authorization": bloxlink_api_key}
+    response = requests.get(bloxlink_api, headers=headers)
+    data = response.json()
+    print(data)
+
+    if response.status_code == 404:
+        print(f"ERROR: Could not verify {member.name} Bloxlink error")
+
+    if response.status_code == 200:
+        roblox_id = data['robloxID']
+        print(roblox_id)
+        roblox_api = f"https://users.roblox.com/v1/users/{roblox_id}"
+        roblox_response = requests.get(roblox_api)
+        print(roblox_response.json())
+        roblox_data = roblox_response.json()
+        user_description = roblox_data.get("description")
+        user_created = roblox_data.get("created")
+        user_isBanned = roblox_data.get("isBanned")
+        user_hasVerifiedBadge = roblox_data.get("hasVerifiedBadge")
+        user_name = roblox_data.get("name")
+        user_displayName = roblox_data.get("displayName")
+        user_link = f"https://www.roblox.com/users/{roblox_id}/profile"
+
+        if roblox_response.status_code == 200:
+            print(f"SUCCESS: Verified {member.name} as {user_displayName}")
+            await member.remove_roles(un_verified)
+            await member.add_roles(verified)
+            await member.edit(nick=user_displayName)
+            print(user_isBanned)
+
+            if user_isBanned:
+                await member.remove_roles(verified, reason="User is banned from roblox")
+                await member.add_roles(banned_role, reason="User is banned from roblox")
+                print(f"WARN: {member.name} or {user_name} or {user_displayName} at {user_link} is banned from roblox!")
+                huw = bot.get_user(618331718692241408)
+                offender = bot.get_user(member.id)
+                await offender.send(
+                    f"Hey! \n \n Welcome to new town city discord server! \n \n But you're banned from roblox :( so that means that you have been suspended from our discord server. \n \n If you want to be unsuspended you should: \n - keep you're DM's open \n - wait for staff member to DM you (DO NOT ping members of staff!) \n - reply to all of the staff members questions \n - if you do all this there still is a chance you will not be unsuspended because being banned from ROBLOX is against our rules!")
+                await huw.send(
+                    f"WARN: Discord member: {member.name} with roblox names: {user_name} and {user_displayName} at roblox profile link: {user_link} is banned from roblox!")
+        else:
+            print(f"ERROR: Could not verify {member.name} Roblox error")
+    else:
+        print(f"ERROR: Could not verify {member.name} Full Error")
 
 
 
 
+# sets the support message
 async def support_reset_startup():
     authenticated_users = await read_authenticated_users()
-    guild = bot.guilds[1221200110197674075]  # Assuming the bot is in only one guild
-    support_channel = guild.get_channel(1223250744216649818)  # Your support channel ID
+    guild = bot.guilds[0]
+    support_channel = guild.get_channel(1223250744216649818)
 
     if authenticated_users and support_channel:
         view = Support()
@@ -227,6 +428,68 @@ async def support_reset_startup():
         await support_channel.send(embed=embed, view=view)
 
 
+
+
+# resets the support embed gui
+@bot.tree.command(name="lookup", description="Looks up discord user and outputs their roblox profile")
+async def lookup(interaction: discord.Interaction, user: discord.Member):
+    authenticated_users = await read_authenticated_users()
+    bloxlink_api = f'https://api.blox.link/v4/public/guilds/1221200110197674075/discord-to-roblox/{user.id}'
+    bloxlink_api_key = 'e44fb0bf-21ac-4ef8-8c4d-8cb1dcae378e'
+
+    if interaction.user.id in authenticated_users:
+        try:
+            headers = {"Authorization": bloxlink_api_key}
+            response = requests.get(bloxlink_api, headers=headers)
+            response.raise_for_status()  # Raise HTTPError for 4xx and 5xx status codes
+            data = response.json()
+            print(data)
+
+
+            if roblox_response.status_code == 200:
+                roblox_id = data['robloxID']
+                print(roblox_id)
+                roblox_api = f"https://users.roblox.com/v1/users/{roblox_id}"
+                roblox_response = requests.get(roblox_api)
+                print(roblox_response.json())
+                roblox_data = roblox_response.json()
+                user_description = roblox_data.get("description")
+                user_created = roblox_data.get("created")
+                user_isBanned = roblox_data.get("isBanned")
+                user_hasVerifiedBadge = roblox_data.get("hasVerifiedBadge")
+                user_name = roblox_data.get("name")
+                user_displayName = roblox_data.get("displayName")
+
+
+
+            embed = discord.Embed(
+                title=f"Discord ID: {user.id} \nRoblox ID: {roblox_id} \nhttps://www.roblox.com/users/{roblox_id}/profile",
+                colour=discord.Color.blue(),
+                description=f"Description: {user_description} \n \n Account Created: {user_created} \n \n Banned? {user_isBanned} \n \n Verified Badge? {user_hasVerifiedBadge} \n \n Username: {user_name} \n \n Display Name: {user_displayName}"
+            )
+            print("DEBUG: Loading message ready to send to user")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            print("DEBUG: Sent")
+        except requests.exceptions.HTTPError as e:
+            print(f"ERROR: {e}")
+            if e.response.status_code == 404:
+                # User not found, handle accordingly
+                embed = discord.Embed(
+                    title="User not found",
+                    colour=discord.Color.red()
+                )
+                try:
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                except discord.errors.NotFound:
+                    print("DEBUG: Interaction not found")
+            else:
+                # Handle other HTTP errors if needed
+                await interaction.response.send_message("An error occurred while processing your request", ephemeral=True)
+
+
+
+
+# resets the support embed gui
 @bot.tree.command(name="support_reset", description="Creates/Resets the support GUI")
 async def support_reset(interaction: discord.Interaction):
     authenticated_users = await read_authenticated_users()
@@ -423,7 +686,7 @@ async def remove(interaction: discord.Interaction, userid: str):
 async def help(interaction: discord.Interaction):
     commands_embed = discord.Embed(
         title="NTC Commands",
-        description="/help (shows the list of commands) \n /auth (authenticates users to use NTC commands) \n /remove (removes users from the auth list) \n /announcement (posts an announcement in the channel) \n /support_rest (resets the ticket support sys) \n /reload_cfg (reloads the bots config) \n /status (changes the servers status)",
+        description="/help (shows the list of commands) \n /auth (authenticates users to use NTC commands) \n /remove (removes users from the auth list) \n /announcement (posts an announcement in the channel) \n /support_rest (resets the ticket support sys) \n /reload_cfg (reloads the bots config) \n /status (changes the servers status) \n /close (closes the ticket) \n /claim (claims the ticket)",
         color=discord.Color.blue()
     )
     user=interaction.user
@@ -456,6 +719,7 @@ async def reload_cfg(interaction: discord.Interaction):
         await interaction.response.send_message(embed=embed, ephemeral=True)  # Await the send_message() coroutine
     else:
         await interaction.response.send_message(embed=perm_error, ephemeral=True)  # Await the send_message() coroutine
+
 
 # start bot loop
 bot.run(DISCORD_TOKEN)
