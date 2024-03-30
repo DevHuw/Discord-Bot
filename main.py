@@ -361,13 +361,19 @@ async def on_member_join(member):
     bloxlink_api = f'https://api.blox.link/v4/public/guilds/1221200110197674075/discord-to-roblox/{member.id}'
     bloxlink_api_key = 'e44fb0bf-21ac-4ef8-8c4d-8cb1dcae378e'
     headers = {"Authorization": bloxlink_api_key}
+    welcome_channel = bot.get_channel(1223612943208419409)
     response = requests.get(bloxlink_api, headers=headers)
     data = response.json()
     print(data)
-
+    embed = discord.Embed(
+        description=f"## Hey <@{member.id}> welcome to new town city! \n \nIf you need help with anything feel free to make a ticket <#1223250744216649818> \n Check out our partners <#1223445006874972180> \n See when our server starts! <#1222911491821277276>",
+        colour=discord.Color.blue()
+    )
+    await welcome_channel.send(embed=embed)
+    await welcome_channel.send(f"<@{member.id}>")
+    await welcome_channel.last_message.delete()
     if response.status_code == 404:
         print(f"ERROR: Could not verify {member.name} Bloxlink error")
-
     if response.status_code == 200:
         roblox_id = data['robloxID']
         print(roblox_id)
@@ -389,7 +395,6 @@ async def on_member_join(member):
             await member.add_roles(verified)
             await member.edit(nick=user_displayName)
             print(user_isBanned)
-
             if user_isBanned:
                 await member.remove_roles(verified, reason="User is banned from roblox")
                 await member.add_roles(banned_role, reason="User is banned from roblox")
