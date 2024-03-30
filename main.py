@@ -430,61 +430,49 @@ async def support_reset_startup():
 
 
 
-# resets the support embed gui
+# look up slash command
 @bot.tree.command(name="lookup", description="Looks up discord user and outputs their roblox profile")
 async def lookup(interaction: discord.Interaction, user: discord.Member):
     authenticated_users = await read_authenticated_users()
-    bloxlink_api = f'https://api.blox.link/v4/public/guilds/1221200110197674075/discord-to-roblox/{user.id}'
-    bloxlink_api_key = 'e44fb0bf-21ac-4ef8-8c4d-8cb1dcae378e'
-
     if interaction.user.id in authenticated_users:
-        try:
-            headers = {"Authorization": bloxlink_api_key}
-            response = requests.get(bloxlink_api, headers=headers)
-            response.raise_for_status()  # Raise HTTPError for 4xx and 5xx status codes
-            data = response.json()
-            print(data)
+        bloxlink_api = f'https://api.blox.link/v4/public/guilds/1221200110197674075/discord-to-roblox/{user.id}'
+        bloxlink_api_key = 'e44fb0bf-21ac-4ef8-8c4d-8cb1dcae378e'
+        headers = {"Authorization": bloxlink_api_key}
+        response = requests.get(bloxlink_api, headers=headers)
+        data = response.json()
+        print(data)
 
+        if response.status_code == 404:
+            print(f"ERROR: Could not verify {user.name} Bloxlink error")
+
+        if response.status_code == 200:
+            roblox_id = data['robloxID']
+            print(roblox_id)
+            roblox_api = f"https://users.roblox.com/v1/users/{roblox_id}"
+            roblox_response = requests.get(roblox_api)
+            print(roblox_response.json())
+            roblox_data = roblox_response.json()
+            user_description = roblox_data.get("description")
+            user_created = roblox_data.get("created")
+            user_isBanned = roblox_data.get("isBanned")
+            user_hasVerifiedBadge = roblox_data.get("hasVerifiedBadge")
+            user_name = roblox_data.get("name")
+            user_displayName = roblox_data.get("displayName")
+            user_link = f"https://www.roblox.com/users/{roblox_id}/profile"
 
             if roblox_response.status_code == 200:
-                roblox_id = data['robloxID']
-                print(roblox_id)
-                roblox_api = f"https://users.roblox.com/v1/users/{roblox_id}"
-                roblox_response = requests.get(roblox_api)
-                print(roblox_response.json())
-                roblox_data = roblox_response.json()
-                user_description = roblox_data.get("description")
-                user_created = roblox_data.get("created")
-                user_isBanned = roblox_data.get("isBanned")
-                user_hasVerifiedBadge = roblox_data.get("hasVerifiedBadge")
-                user_name = roblox_data.get("name")
-                user_displayName = roblox_data.get("displayName")
-
-
-
-            embed = discord.Embed(
-                title=f"Discord ID: {user.id} \nRoblox ID: {roblox_id} \nhttps://www.roblox.com/users/{roblox_id}/profile",
-                colour=discord.Color.blue(),
-                description=f"Description: {user_description} \n \n Account Created: {user_created} \n \n Banned? {user_isBanned} \n \n Verified Badge? {user_hasVerifiedBadge} \n \n Username: {user_name} \n \n Display Name: {user_displayName}"
-            )
-            print("DEBUG: Loading message ready to send to user")
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            print("DEBUG: Sent")
-        except requests.exceptions.HTTPError as e:
-            print(f"ERROR: {e}")
-            if e.response.status_code == 404:
-                # User not found, handle accordingly
+                print(f"SUCCESS: got: {user.name} as {user_displayName}")
                 embed = discord.Embed(
-                    title="User not found",
-                    colour=discord.Color.red()
+                    title=f"Roblox Look Up For {user.name}",
+                    description=f"Description: {user_description} \n Created On: {user_created} \n Banned? {user_isBanned} \n Roblox Verified Badge? {user_hasVerifiedBadge} \n Username: {user_name} \n Display Name: {user_displayName} \n Roblox Profile Link: {user_link}"
                 )
-                try:
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
-                except discord.errors.NotFound:
-                    print("DEBUG: Interaction not found")
+                interaction.response.send_message(embed=embed, ephemeral=True)
             else:
-                # Handle other HTTP errors if needed
-                await interaction.response.send_message("An error occurred while processing your request", ephemeral=True)
+                print(f"ERROR: Could not get {user.name} Roblox error")
+        else:
+            print(f"ERROR: Could not get {user.name} Full Error")
+    else:
+        interaction.response.send_message("Not Permitted!", ephemeral=True)
 
 
 
